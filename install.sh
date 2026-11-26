@@ -31,6 +31,17 @@ app="$stage/opt/pt"
 [[ -d $app && ! -L $app ]] || fail "Unsupported package layout. Expected opt/pt."
 if [[ -f $app/packettracer.AppImage && -x $app/packettracer.AppImage ]]; then
     format=appimage
+    mkdir -p -- "$stage/browser"
+    cat > "$stage/browser/xdg-open" <<'OPENER'
+#!/usr/bin/bash
+# Open web links outside the AppImage's bundled Qt and shared libraries.
+unset LD_LIBRARY_PATH LD_PRELOAD QT_PLUGIN_PATH QT_QPA_PLATFORM_PLUGIN_PATH
+if [[ $# == 1 && ( $1 == https://* || $1 == http://* ) && -x /usr/bin/firefox ]]; then
+    exec /usr/bin/firefox "$1"
+fi
+exec /usr/bin/xdg-open "$@"
+OPENER
+    chmod +x "$stage/browser/xdg-open"
 elif [[ -f $app/bin/PacketTracer && -x $app/bin/PacketTracer ]]; then
     format=legacy
 else
@@ -64,10 +75,16 @@ printf '%s\n' "$version" > "$stage/version"
 cat > "$stage/launch" <<'LAUNCH'
 #!/usr/bin/env bash
 set -euo pipefail
-app="$(dirname -- "$(realpath -- "$0")")/opt/pt"
+slot="$(dirname -- "$(realpath -- "$0")")"
+app="$slot/opt/pt"
 if [[ -x $app/packettracer.AppImage ]]; then
     # Run the vendor bundle without requiring a FUSE mount.
     export APPIMAGE_EXTRACT_AND_RUN=1
+    if [[ -x /usr/bin/firefox ]]; then
+        export PATH="$slot/browser:$PATH"
+        export BROWSER="$slot/browser/xdg-open"
+        export XDG_CURRENT_DESKTOP=generic
+    fi
     exec "$app/packettracer.AppImage" "$@"
 fi
 export LD_LIBRARY_PATH="$app/lib"
@@ -95,4 +112,9 @@ ln -s -- "$slot" "$stage/current"
 mv -fT -- "$desktop" "$apps/packettracer-fedora.desktop"
 mv -fT -- "$stage/current" "$base/current"
 trap - EXIT
-printf 'Packet Tracer %s installed. Launch it from your applications menu.\n' "$version"
+printf 'Packet Tracer %s installed.\n' "$version"
+if [[ $format == appimage ]]; then
+    printf 'First launch: run "%s/current/launch" in your terminal to review the Cisco license.\n' "$base"
+else
+    printf 'Launch Packet Tracer from your applications menu.\n'
+fi
