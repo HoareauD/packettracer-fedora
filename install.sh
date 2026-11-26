@@ -23,6 +23,10 @@ apps="$HOME/.local/share/applications"
 mkdir -p -- "$base" "$apps"
 exec 9>"$base/.lock"
 flock -x 9
+first_install=false
+if [[ ! -x $base/current/launch ]]; then
+    first_install=true
+fi
 stage=$(mktemp -d "$base/build.XXXXXXXX")
 trap 'rm -rf -- "$stage"' EXIT
 
@@ -113,7 +117,13 @@ mv -fT -- "$desktop" "$apps/packettracer-fedora.desktop"
 mv -fT -- "$stage/current" "$base/current"
 trap - EXIT
 printf 'Packet Tracer %s installed.\n' "$version"
-if [[ $format == appimage ]]; then
+if [[ $format == appimage && $first_install == true && -t 0 && -t 1 &&
+      ( -n ${DISPLAY:-} || -n ${WAYLAND_DISPLAY:-} ) ]]; then
+    printf 'Starting Packet Tracer. Review the Cisco license if prompted.\n'
+    exec 9>&-
+    exec "$stage/launch"
+fi
+if [[ $format == appimage && $first_install == true ]]; then
     printf 'First launch: run "%s/current/launch" in your terminal to review the Cisco license.\n' "$base"
 else
     printf 'Launch Packet Tracer from your applications menu.\n'

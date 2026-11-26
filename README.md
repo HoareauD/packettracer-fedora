@@ -15,7 +15,7 @@ bash update.sh ~/Downloads/CiscoPacketTracer_new.deb
 bash uninstall.sh
 ```
 
-For the first launch, run the command below in a terminal. Review the Cisco license and choose whether to accept or decline it. Keep Packet Tracer open while signing in through Firefox. You can then launch it from the applications menu.
+Packet Tracer starts automatically on a fresh install from a terminal in your desktop session. If you installed it without an interactive terminal, run the command below for the first launch. Review the Cisco license and choose whether to accept or decline it. Keep Packet Tracer open while signing in through Firefox. You can then launch it from the applications menu.
 
 ```bash
 "$HOME/.local/share/packettracer-fedora/current/launch"

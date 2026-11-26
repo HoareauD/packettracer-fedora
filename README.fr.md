@@ -15,7 +15,7 @@ bash update.sh /chemin/vers/CiscoPacketTracer_nouveau.deb
 bash uninstall.sh
 ```
 
-Au premier lancement, exécutez la commande ci-dessous dans un terminal. Lisez les conditions Cisco et choisissez vous-même de les accepter ou de les refuser. Laissez Packet Tracer ouvert pendant la connexion dans Firefox. Vous pourrez ensuite le démarrer depuis le menu des applications.
+Lors d’une première installation depuis un terminal graphique, Packet Tracer démarre automatiquement. Si l’installation a été lancée sans terminal interactif, utilisez la commande ci-dessous pour le premier démarrage. Lisez les conditions Cisco et choisissez vous-même de les accepter ou de les refuser. Laissez Packet Tracer ouvert pendant la connexion dans Firefox. Vous pourrez ensuite le démarrer depuis le menu des applications.
 
 ```bash
 "$HOME/.local/share/packettracer-fedora/current/launch"
