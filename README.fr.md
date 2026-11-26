@@ -7,6 +7,8 @@ Installateur communautaire pour Fedora x86_64 avec DNF. Le lancement sur Fedora 
 Téléchargez le fichier `.deb` Ubuntu 64 bits depuis [Cisco Networking Academy](https://www.netacad.com/resources/lab-downloads). Consultez les conditions de licence de Cisco avant d’utiliser le logiciel. La licence MIT couvre les scripts et la documentation de ce dépôt. Packet Tracer est disponible séparément auprès de Cisco.
 
 ```bash
+git clone https://github.com/HoareauD/packettracer-fedora.git
+cd packettracer-fedora
 bash install.sh /chemin/vers/CiscoPacketTracer.deb
 bash doctor.sh
 bash update.sh /chemin/vers/CiscoPacketTracer_nouveau.deb
