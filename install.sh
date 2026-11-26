@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() { printf '%s\n' "$*" >&2; exit 1; }
+
+[[ $# == 1 && -f $1 ]] || fail "Usage: bash install.sh /path/to/CiscoPacketTracer.deb"
+(( EUID != 0 )) || fail "Run as your desktop user. DNF will request sudo if needed."
+package=$(realpath -- "$1")
+# shellcheck disable=SC1091
+source /etc/os-release
+[[ ${ID:-} == fedora && $(uname -m) == x86_64 ]] || fail "Fedora x86_64 is required."
+printf 'Fedora %s\n' "${VERSION_ID:-unknown}"
+
+if ! command -v dpkg-deb >/dev/null; then
+    sudo dnf install /usr/bin/dpkg-deb
+fi
+name=$(dpkg-deb -f "$package" Package)
+[[ $name == packettracer && $(dpkg-deb -f "$package" Architecture) == amd64 ]] ||
+    fail "Expected the Cisco Packet Tracer amd64 package."
+version=$(dpkg-deb -f "$package" Version)
+base="$HOME/.local/share/packettracer-fedora"
+apps="$HOME/.local/share/applications"
+mkdir -p -- "$base" "$apps"
+exec 9>"$base/.lock"
+flock -x 9
+stage=$(mktemp -d "$base/build.XXXXXXXX")
+trap 'rm -rf -- "$stage"' EXIT
+
+dpkg-deb -x "$package" "$stage"
+app="$stage/opt/pt"
+[[ -d $app && ! -L $app && -x $app/bin/PacketTracer ]] ||
+    fail "Unsupported package layout. Expected opt/pt/bin/PacketTracer."
+
+# Resolve missing libraries against the extracted Cisco bundle and Fedora.
+export LD_LIBRARY_PATH="$app/lib"
+report=$(ldd "$app/bin/PacketTracer")
+plugin=$(find "$app" -name libqxcb.so -print -quit)
+if [[ -n $plugin ]]; then
+    report+=$'\n'$(ldd "$plugin")
+fi
+mapfile -t missing < <(awk '$2 == "=>" && $3 == "not" {print $1}' <<<"$report" | sort -u)
+if (( ${#missing[@]} )); then
+    provides=()
+    for library in "${missing[@]}"; do
+        [[ $library =~ ^[a-zA-Z0-9_.+-]+$ ]] || fail "Invalid library name: $library"
+        provides+=("${library}()(64bit)")
+    done
+    sudo dnf install "${provides[@]}"
+fi
+if [[ ! -x /usr/bin/Xwayland && -n $plugin ]]; then
+    sudo dnf install /usr/bin/Xwayland
+fi
+
+slot=${stage##*/}
+printf '%s\n' "$version" > "$stage/version"
+cat > "$stage/launch" <<'LAUNCH'
+#!/usr/bin/env bash
+set -euo pipefail
+app="$(dirname -- "$(realpath -- "$0")")/opt/pt"
+export LD_LIBRARY_PATH="$app/lib"
+if [[ ${XDG_SESSION_TYPE:-} == wayland && -z ${QT_QPA_PLATFORM:-} ]]; then
+    export QT_QPA_PLATFORM=xcb
+fi
+cd -- "$app"
+exec "$app/bin/PacketTracer" "$@"
+LAUNCH
+chmod +x "$stage/launch"
+desktop=$(mktemp "$apps/.packettracer-fedora.XXXXXXXX")
+trap 'rm -f -- "$desktop"; rm -rf -- "$stage"' EXIT
+cat > "$desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Cisco Packet Tracer
+Exec=sh -c "exec ~/.local/share/packettracer-fedora/current/launch"
+Icon=applications-internet
+Categories=Education;Network;
+Terminal=false
+DESKTOP
+
+# Keep the previous payload so existing processes can still open its resources.
+ln -s -- "$slot" "$stage/current"
+mv -fT -- "$desktop" "$apps/packettracer-fedora.desktop"
+mv -fT -- "$stage/current" "$base/current"
+trap - EXIT
+printf 'Packet Tracer %s installed. Launch it from your applications menu.\n' "$version"
