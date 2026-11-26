@@ -8,6 +8,13 @@ base="$HOME/.local/share/packettracer-fedora/current"
 [[ -x $base/launch ]] || { echo 'Packet Tracer is not installed by these scripts.' >&2; exit 1; }
 app="$base/opt/pt"
 printf 'Packet Tracer: %s\n' "$(cat "$base/version")"
+if [[ -x $app/packettracer.AppImage ]]; then
+    printf 'Package format: AppImage (extract and run)\n'
+    if [[ ${1:-} == --qt-debug ]]; then
+        QT_DEBUG_PLUGINS=1 exec "$base/launch"
+    fi
+    exit 0
+fi
 export LD_LIBRARY_PATH="$app/lib"
 plugin=$(find "$app" -name libqxcb.so -print -quit)
 if [[ -n $plugin ]]; then

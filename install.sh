@@ -28,27 +28,35 @@ trap 'rm -rf -- "$stage"' EXIT
 
 dpkg-deb -x "$package" "$stage"
 app="$stage/opt/pt"
-[[ -d $app && ! -L $app && -x $app/bin/PacketTracer ]] ||
-    fail "Unsupported package layout. Expected opt/pt/bin/PacketTracer."
+[[ -d $app && ! -L $app ]] || fail "Unsupported package layout. Expected opt/pt."
+if [[ -f $app/packettracer.AppImage && -x $app/packettracer.AppImage ]]; then
+    format=appimage
+elif [[ -f $app/bin/PacketTracer && -x $app/bin/PacketTracer ]]; then
+    format=legacy
+else
+    fail "Unsupported package layout. Expected packettracer.AppImage or bin/PacketTracer in opt/pt."
+fi
 
-# Resolve missing libraries against the extracted Cisco bundle and Fedora.
-export LD_LIBRARY_PATH="$app/lib"
-report=$(ldd "$app/bin/PacketTracer")
-plugin=$(find "$app" -name libqxcb.so -print -quit)
-if [[ -n $plugin ]]; then
-    report+=$'\n'$(ldd "$plugin")
-fi
-mapfile -t missing < <(awk '$2 == "=>" && $3 == "not" {print $1}' <<<"$report" | sort -u)
-if (( ${#missing[@]} )); then
-    provides=()
-    for library in "${missing[@]}"; do
-        [[ $library =~ ^[a-zA-Z0-9_.+-]+$ ]] || fail "Invalid library name: $library"
-        provides+=("${library}()(64bit)")
-    done
-    sudo dnf install "${provides[@]}"
-fi
-if [[ ! -x /usr/bin/Xwayland && -n $plugin ]]; then
-    sudo dnf install /usr/bin/Xwayland
+if [[ $format == legacy ]]; then
+    # Resolve missing libraries against the extracted Cisco bundle and Fedora.
+    export LD_LIBRARY_PATH="$app/lib"
+    report=$(ldd "$app/bin/PacketTracer")
+    plugin=$(find "$app" -name libqxcb.so -print -quit)
+    if [[ -n $plugin ]]; then
+        report+=$'\n'$(ldd "$plugin")
+    fi
+    mapfile -t missing < <(awk '$2 == "=>" && $3 == "not" {print $1}' <<<"$report" | sort -u)
+    if (( ${#missing[@]} )); then
+        provides=()
+        for library in "${missing[@]}"; do
+            [[ $library =~ ^[a-zA-Z0-9_.+-]+$ ]] || fail "Invalid library name: $library"
+            provides+=("${library}()(64bit)")
+        done
+        sudo dnf install "${provides[@]}"
+    fi
+    if [[ ! -x /usr/bin/Xwayland && -n $plugin ]]; then
+        sudo dnf install /usr/bin/Xwayland
+    fi
 fi
 
 slot=${stage##*/}
@@ -57,6 +65,11 @@ cat > "$stage/launch" <<'LAUNCH'
 #!/usr/bin/env bash
 set -euo pipefail
 app="$(dirname -- "$(realpath -- "$0")")/opt/pt"
+if [[ -x $app/packettracer.AppImage ]]; then
+    # Run the vendor bundle without requiring a FUSE mount.
+    export APPIMAGE_EXTRACT_AND_RUN=1
+    exec "$app/packettracer.AppImage" "$@"
+fi
 export LD_LIBRARY_PATH="$app/lib"
 if [[ ${XDG_SESSION_TYPE:-} == wayland && -z ${QT_QPA_PLATFORM:-} ]]; then
     export QT_QPA_PLATFORM=xcb
