@@ -7,6 +7,8 @@ Community installer for Fedora x86_64 with DNF. Fedora 45 and the Cisco GUI stil
 Download the Ubuntu 64-bit `.deb` from [Cisco Networking Academy](https://www.netacad.com/resources/lab-downloads). Review Cisco’s license terms before using the software. The repository contains MIT-licensed scripts and documentation. Obtain Packet Tracer separately from Cisco.
 
 ```bash
+git clone https://github.com/HoareauD/packettracer-fedora.git
+cd packettracer-fedora
 bash install.sh ~/Downloads/CiscoPacketTracer_example.deb
 bash doctor.sh
 bash update.sh ~/Downloads/CiscoPacketTracer_new.deb
